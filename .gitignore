@@ -1,0 +1,16 @@
+node_modules/
+dist/
+lib/
+.firebase/
+.emulator-data/
+*.local
+.env
+.env.*
+!.env.example
+!.env.*.example
+coverage/
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

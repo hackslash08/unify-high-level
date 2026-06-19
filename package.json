@@ -1,0 +1,30 @@
+{
+  "name": "highlevel-integrations-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-native integration platform — unified connectors, normalization, and sync into HighLevel",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "dev": "pnpm --parallel -r run dev",
+    "dev:web": "pnpm --filter @highlevel/web dev",
+    "dev:functions": "pnpm --filter @highlevel/functions dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "emulators": "pnpm --filter @highlevel/functions build && firebase emulators:start --import=./.emulator-data --export-on-exit",
+    "dev:share": "node scripts/share-dev.mjs",
+    "deploy": "pnpm build && firebase deploy",
+    "deploy:hosting": "pnpm --filter @highlevel/web build && firebase deploy --only hosting",
+    "deploy:functions": "pnpm build && firebase deploy --only functions"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.8",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

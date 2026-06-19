@@ -1,0 +1,31 @@
+{
+  "name": "@highlevel/functions",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "test": "vitest run --config ../vitest.config.ts functions"
+  },
+  "engines": {
+    "node": "20"
+  },
+  "dependencies": {
+    "@highlevel/connectors": "workspace:*",
+    "@highlevel/shared": "workspace:*",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "firebase-admin": "^13.0.2",
+    "firebase-functions": "^6.3.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

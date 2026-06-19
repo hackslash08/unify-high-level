@@ -1,0 +1,29 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "connections",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "connectorId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "syncRuns",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "startedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "syncErrors",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "syncRunId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
