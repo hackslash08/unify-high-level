@@ -6,9 +6,12 @@ import { db, collections } from "../lib/firestore.js";
 import { saveTokens, tokenDocId } from "../lib/tokens.js";
 import type { AuthedRequest } from "../lib/auth-middleware.js";
 import { requireAuth } from "../lib/auth-middleware.js";
+import {
+  connectorRedirectUri,
+  mockConsentUrl,
+} from "../lib/oauth-utils.js";
 
 export const oauthRouter = Router();
-
 
 function generatePkce(): { verifier: string; challenge: string } {
   const verifier = crypto.randomBytes(32).toString("base64url");
@@ -17,6 +20,10 @@ function generatePkce(): { verifier: string; challenge: string } {
     .update(verifier)
     .digest("base64url");
   return { verifier, challenge };
+}
+
+function hubspotOAuthConfigured(): boolean {
+  return Boolean(process.env.HUBSPOT_CLIENT_ID && process.env.HUBSPOT_CLIENT_SECRET);
 }
 
 /** HighLevel OAuth — start */
@@ -45,7 +52,7 @@ oauthRouter.get("/hl/authorize", requireAuth, async (req: AuthedRequest, res) =>
     url.searchParams.set(key, value);
   }
 
-  res.json({ url: url.toString() });
+  res.json({ url: url.toString(), flow: "oauth2_authorization_code" });
 });
 
 /** HighLevel OAuth — callback */
@@ -135,31 +142,15 @@ oauthRouter.get(
       return;
     }
 
-    if (connector.meta.isMock) {
-      const connectionRef = db.collection(collections.connections).doc();
-      await connectionRef.set({
-        id: connectionRef.id,
-        userId,
-        connectorId,
-        status: "connected",
-        externalAccountName: "Mock Account",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-      await saveTokens(tokenDocId(userId, connectorId), {
-        userId,
-        provider: connectorId,
-        accessToken: "mock-token",
-      });
-      res.json({ url: `${config.appUrl}/connectors/${connectorId}?connected=true` });
-      return;
-    }
-
-    if (connector.meta.authType === "private_token") {
+    /** HubSpot: prefer OAuth 2.0; fall back to private app token only if OAuth not configured */
+    if (connectorId === "hubspot" && !hubspotOAuthConfigured()) {
       const envKey = connector.meta.privateTokenEnvKey ?? "HUBSPOT_PRIVATE_APP_TOKEN";
       const accessToken = process.env[envKey];
       if (!accessToken) {
-        res.status(500).json({ error: `${envKey} is not configured on the server` });
+        res.status(500).json({
+          error:
+            "HubSpot OAuth not configured. Set HUBSPOT_CLIENT_ID and HUBSPOT_CLIENT_SECRET (or HUBSPOT_PRIVATE_APP_TOKEN for dev).",
+        });
         return;
       }
 
@@ -182,6 +173,7 @@ oauthRouter.get(
         connectorId,
         status: "connected",
         externalAccountName: "HubSpot Private App",
+        authMethod: "private_token",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -190,7 +182,10 @@ oauthRouter.get(
         provider: connectorId,
         accessToken,
       });
-      res.json({ url: `${config.appUrl}/connectors/${connectorId}?connected=true` });
+      res.json({
+        url: `${config.appUrl}/connectors/${connectorId}?connected=true`,
+        flow: "private_token",
+      });
       return;
     }
 
@@ -202,18 +197,35 @@ oauthRouter.get(
     const state = crypto.randomBytes(16).toString("hex");
     const pkce = connector.oauth.usePkce ? generatePkce() : undefined;
 
-    await db.collection(collections.oauthStates).doc(state).set({
+    const oauthState: Record<string, unknown> = {
       userId,
       provider: connectorId,
-      codeVerifier: pkce?.verifier,
       createdAt: Date.now(),
-    });
+    };
+    if (pkce?.verifier) {
+      oauthState.codeVerifier = pkce.verifier;
+    }
+
+    await db.collection(collections.oauthStates).doc(state).set(oauthState);
+
+    /** Mock connectors: simulated OAuth consent screen (authorization code flow) */
+    if (connector.meta.isMock) {
+      res.json({
+        url: mockConsentUrl(state, connectorId),
+        flow: "oauth2_authorization_code_mock",
+      });
+      return;
+    }
 
     const clientId = process.env[connector.oauth.clientIdEnvKey] ?? "";
-    const redirectUri =
-      connectorId === "google-contacts"
-        ? config.google.redirectUri
-        : `${config.functionsUrl}/api/oauth/connector/${connectorId}/callback`;
+    if (!clientId) {
+      res.status(500).json({
+        error: `${connector.oauth.clientIdEnvKey} is not configured on the server`,
+      });
+      return;
+    }
+
+    const redirectUri = connectorRedirectUri(connectorId);
 
     const params = new URLSearchParams({
       response_type: "code",
@@ -221,9 +233,12 @@ oauthRouter.get(
       redirect_uri: redirectUri,
       scope: connector.oauth.scopes.join(" "),
       state,
-      access_type: "offline",
-      prompt: "consent",
     });
+
+    if (connectorId === "google-contacts") {
+      params.set("access_type", "offline");
+      params.set("prompt", "consent");
+    }
 
     if (pkce) {
       params.set("code_challenge", pkce.challenge);
@@ -232,6 +247,7 @@ oauthRouter.get(
 
     res.json({
       url: `${connector.oauth.authorizeUrl}?${params.toString()}`,
+      flow: "oauth2_authorization_code",
     });
   }
 );
@@ -247,7 +263,7 @@ oauthRouter.get("/connector/:connectorId/callback", async (req, res) => {
   }
 
   const connector = getConnector(connectorId);
-  if (!connector?.oauth) {
+  if (!connector) {
     res.status(404).send("Connector not found");
     return;
   }
@@ -258,52 +274,77 @@ oauthRouter.get("/connector/:connectorId/callback", async (req, res) => {
     return;
   }
 
-  const { userId, codeVerifier } = stateSnap.data() as {
+  const stateData = stateSnap.data() as {
     userId: string;
     codeVerifier?: string;
+    mockAuthCode?: string;
   };
+
+  const { userId, codeVerifier, mockAuthCode } = stateData;
   await db.collection(collections.oauthStates).doc(state).delete();
 
-  const clientId = process.env[connector.oauth.clientIdEnvKey] ?? "";
-  const clientSecret = process.env[connector.oauth.clientSecretEnvKey] ?? "";
-  const redirectUri = config.google.redirectUri;
+  let accessToken: string;
+  let refreshToken: string | undefined;
+  let expiresAt: string | undefined;
 
-  const body = new URLSearchParams({
-    grant_type: "authorization_code",
-    code,
-    client_id: clientId,
-    client_secret: clientSecret,
-    redirect_uri: redirectUri,
-  });
+  /** Mock OAuth: validate authorization code issued by our mock provider */
+  if (connector.meta.isMock) {
+    if (!mockAuthCode || mockAuthCode !== code) {
+      res.status(400).send("Invalid authorization code");
+      return;
+    }
+    accessToken = `mock_access_${crypto.randomBytes(8).toString("hex")}`;
+    refreshToken = `mock_refresh_${crypto.randomBytes(8).toString("hex")}`;
+    expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
+  } else {
+    if (!connector.oauth) {
+      res.status(400).send("Connector does not support OAuth");
+      return;
+    }
 
-  if (codeVerifier) body.set("code_verifier", codeVerifier);
+    const clientId = process.env[connector.oauth.clientIdEnvKey] ?? "";
+    const clientSecret = process.env[connector.oauth.clientSecretEnvKey] ?? "";
+    const redirectUri = connectorRedirectUri(connectorId);
 
-  const tokenRes = await fetch(connector.oauth.tokenUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
+    const body = new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
+    });
 
-  if (!tokenRes.ok) {
-    res.status(500).send(`Token exchange failed: ${await tokenRes.text()}`);
-    return;
+    if (codeVerifier) body.set("code_verifier", codeVerifier);
+
+    const tokenRes = await fetch(connector.oauth.tokenUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+
+    if (!tokenRes.ok) {
+      res.status(500).send(`Token exchange failed: ${await tokenRes.text()}`);
+      return;
+    }
+
+    const tokens = (await tokenRes.json()) as {
+      access_token: string;
+      refresh_token?: string;
+      expires_in?: number;
+    };
+
+    accessToken = tokens.access_token;
+    refreshToken = tokens.refresh_token;
+    expiresAt = tokens.expires_in
+      ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
+      : undefined;
   }
-
-  const tokens = (await tokenRes.json()) as {
-    access_token: string;
-    refresh_token?: string;
-    expires_in?: number;
-  };
-
-  const expiresAt = tokens.expires_in
-    ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
-    : undefined;
 
   await saveTokens(tokenDocId(userId, connectorId), {
     userId,
     provider: connectorId,
-    accessToken: tokens.access_token,
-    refreshToken: tokens.refresh_token,
+    accessToken,
+    refreshToken,
     expiresAt,
   });
 
@@ -313,11 +354,11 @@ oauthRouter.get("/connector/:connectorId/callback", async (req, res) => {
     userId,
     connectorId,
     status: "connected",
+    authMethod: connector.meta.isMock ? "oauth2_mock" : "oauth2",
+    externalAccountName: connector.meta.name,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
 
   res.redirect(`${config.appUrl}/connectors/${connectorId}?connected=true`);
 });
-
-

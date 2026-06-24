@@ -140,8 +140,8 @@ interface Connector {
 | ID | Type | Maps to |
 |----|------|---------|
 | google-contacts | Real OAuth (PKCE) | Google Person → Contact |
-| hubspot | Private App token | HubSpot CRM contact → Contact |
-| mock-stripe | Mock (documented) | Stripe Customer → Contact + Company |
+| hubspot | OAuth 2.0 | HubSpot CRM contact → Contact |
+| mock-stripe | OAuth 2.0 (simulated) | Stripe Customer → Contact + Company |
 
 ---
 
@@ -165,7 +165,7 @@ interface Connector {
 |------|----------------|
 | App auth | Firebase Auth (email/password) |
 | HighLevel | OAuth 2.0 via Cloud Functions; tokens in `tokens` collection |
-| Connectors | OAuth 2.0 + PKCE (Google); Private App token (HubSpot); mock instant-connect |
+| Connectors | OAuth 2.0 (+ PKCE for Google); simulated OAuth for mock Stripe |
 | Token storage | AES-256-GCM encryption (`TOKEN_ENCRYPTION_KEY`) |
 | Client access | Firestore rules — users read own data; tokens server-only |
 

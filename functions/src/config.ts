@@ -19,6 +19,10 @@ export const config = {
     clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
     redirectUri: process.env.GOOGLE_REDIRECT_URI ?? "",
   },
+  hubspot: {
+    clientId: process.env.HUBSPOT_CLIENT_ID ?? "",
+    clientSecret: process.env.HUBSPOT_CLIENT_SECRET ?? "",
+  },
   encryptionKey: process.env.TOKEN_ENCRYPTION_KEY ?? "",
   appUrl: process.env.APP_URL ?? "http://localhost:5173",
   functionsUrl: process.env.FUNCTIONS_URL ?? "http://127.0.0.1:5001/your-firebase-project-id/us-central1",

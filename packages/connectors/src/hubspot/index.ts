@@ -29,12 +29,20 @@ export const hubspotConnector: Connector = {
     id: "hubspot",
     name: "HubSpot",
     description:
-      "HubSpot CRM via Private App access token. Create a Private App in HubSpot Settings and set HUBSPOT_PRIVATE_APP_TOKEN in functions/.env.",
+      "HubSpot CRM via OAuth 2.0. Create a Public App in HubSpot Developer settings and set HUBSPOT_CLIENT_ID / HUBSPOT_CLIENT_SECRET.",
     logoUrl: "/connectors/hubspot.svg",
     category: "crm",
-    authType: "private_token",
+    authType: "oauth2",
     privateTokenEnvKey: "HUBSPOT_PRIVATE_APP_TOKEN",
     supportsPush: true,
+  },
+
+  oauth: {
+    authorizeUrl: "https://app.hubspot.com/oauth/authorize",
+    tokenUrl: "https://api.hubapi.com/oauth/v1/token",
+    scopes: ["crm.objects.contacts.read", "crm.objects.contacts.write"],
+    clientIdEnvKey: "HUBSPOT_CLIENT_ID",
+    clientSecretEnvKey: "HUBSPOT_CLIENT_SECRET",
   },
 
   async authenticate(ctx: ConnectorContext): Promise<boolean> {

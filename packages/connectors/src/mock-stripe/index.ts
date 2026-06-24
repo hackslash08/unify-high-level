@@ -45,12 +45,20 @@ export const mockStripeConnector: Connector = {
     id: "mock-stripe",
     name: "Stripe (Mock)",
     description:
-      "Mock Stripe connector with fixture data. Documented for assignment — swap for real Stripe OAuth in production.",
+      "Mock Stripe connector using OAuth 2.0 authorization code flow (simulated consent) with fixture customer data.",
     logoUrl: "/connectors/stripe.svg",
     category: "payments",
-    authType: "mock",
+    authType: "oauth2",
     supportsPush: false,
     isMock: true,
+  },
+
+  oauth: {
+    authorizeUrl: "mock",
+    tokenUrl: "mock",
+    scopes: ["read:customers", "read:contacts"],
+    clientIdEnvKey: "MOCK_STRIPE_CLIENT_ID",
+    clientSecretEnvKey: "MOCK_STRIPE_CLIENT_SECRET",
   },
 
   async authenticate(): Promise<boolean> {

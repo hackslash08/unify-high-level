@@ -70,7 +70,7 @@ async function disconnect(connectionId: string) {
   <div>
     <h1 class="mb-2 text-3xl font-bold">Connectors</h1>
     <p class="mb-6 text-muted-foreground">
-      Connect external accounts to sync normalized data into HighLevel.
+      Connect external accounts via OAuth 2.0. You will be redirected to authorize access.
     </p>
 
     <Alert v-if="error" variant="destructive" class="mb-4">{{ error }}</Alert>
@@ -98,6 +98,18 @@ async function disconnect(connectionId: string) {
             </Badge>
           </div>
           <p class="text-sm text-muted-foreground">{{ connector.description }}</p>
+          <p class="mt-2 text-xs text-muted-foreground">
+            Auth:
+            <span class="font-medium text-foreground">
+              {{
+                connector.authType === "oauth2"
+                  ? connector.isMock
+                    ? "OAuth 2.0 (simulated)"
+                    : "OAuth 2.0"
+                  : connector.authType
+              }}
+            </span>
+          </p>
         </CardHeader>
         <CardContent class="flex gap-2">
           <Button
@@ -106,7 +118,13 @@ async function disconnect(connectionId: string) {
             :disabled="connecting === connector.id"
             @click="connect(connector.id)"
           >
-            {{ connecting === connector.id ? "Connecting..." : "Connect" }}
+            {{
+              connecting === connector.id
+                ? "Starting OAuth..."
+                : connector.authType === "oauth2"
+                  ? "Connect with OAuth"
+                  : "Connect"
+            }}
           </Button>
           <template v-else>
             <Button size="sm" variant="outline" @click="router.push(`/connectors/${connector.id}`)">

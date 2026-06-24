@@ -58,8 +58,16 @@ async function connectHighLevel() {
             {{ hlConnected ? "Connected" : "Not connected" }}
           </Badge>
         </div>
+        <div v-if="!hlConnected" class="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
+          <p class="font-medium text-foreground">OAuth 2.0 flow</p>
+          <ol class="mt-2 list-decimal space-y-1 pl-4">
+            <li>Click Connect — redirects to HighLevel authorization</li>
+            <li>Choose your location and approve access</li>
+            <li>Callback exchanges code for tokens (server-side, encrypted)</li>
+          </ol>
+        </div>
         <Button v-if="!hlConnected" :disabled="connecting" @click="connectHighLevel">
-          {{ connecting ? "Redirecting..." : "Connect HighLevel" }}
+          {{ connecting ? "Redirecting to HighLevel..." : "Connect HighLevel (OAuth)" }}
         </Button>
         <p v-else class="text-sm text-muted-foreground">
           Your HighLevel account is linked. Syncs will push contacts to your sandbox location.

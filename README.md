@@ -169,8 +169,8 @@ highlevel/
 
 | ID | Auth type | Status | Notes |
 |----|-----------|--------|-------|
-| `mock-stripe` | `mock` | ✅ Working | 3 fixture customers; instant connect |
-| `hubspot` | `private_token` | ✅ Working | Uses `HUBSPOT_PRIVATE_APP_TOKEN` in `functions/.env` |
+| `mock-stripe` | `oauth2` (simulated) | ✅ Working | Full OAuth consent → callback → token exchange; fixture data |
+| `hubspot` | `oauth2` | ✅ With credentials | HubSpot Public App OAuth; private token dev fallback |
 | `google-contacts` | `oauth2` + PKCE | Code ready | Needs `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` |
 
 ### Adding a new connector
@@ -236,6 +236,7 @@ All endpoints require `Authorization: Bearer <Firebase ID Token>` except OAuth c
 | GET | `/oauth/connector/:id/callback` | Connector OAuth callback |
 
 Full product spec: [docs/PRD.md](./docs/PRD.md)  
+**OAuth flows:** [docs/OAUTH.md](./docs/OAUTH.md)  
 Architecture diagrams: [docs/architecture.md](./docs/architecture.md)  
 **Video demo script:** [docs/VIDEO_WALKTHROUGH.md](./docs/VIDEO_WALKTHROUGH.md)
 

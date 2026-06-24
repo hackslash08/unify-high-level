@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import { apiRouter } from "./routes/api.js";
 import { oauthRouter } from "./routes/oauth.js";
+import { oauthMockRouter } from "./routes/oauth-mock.js";
 
 export function createApp(): express.Express {
   const app = express();
@@ -17,10 +18,12 @@ export function createApp(): express.Express {
   app.options(/.*/, cors({ origin: true }));
   app.use(express.json());
 
-  /** Strip /api prefix when invoked via Firebase Hosting rewrite */
+  /** Strip /api prefix when invoked via Firebase Hosting rewrite or Vite proxy */
   app.use((req, _res, next) => {
-    if (req.url.startsWith("/api")) {
-      req.url = req.url.slice(4) || "/";
+    const path = req.url.split("?")[0] ?? req.url;
+    const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    if (path.startsWith("/api")) {
+      req.url = (path.slice(4) || "/") + qs;
     }
     next();
   });
@@ -35,6 +38,7 @@ export function createApp(): express.Express {
   });
 
   app.use("/oauth", oauthRouter);
+  app.use("/oauth/mock", oauthMockRouter);
   app.use("/", apiRouter);
 
   return app;
